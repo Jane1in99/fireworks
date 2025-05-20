@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>烟花特效</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+        }
+        #startButton {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            background: #ff3366;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <button id="startButton">点一下我</button>
+    <canvas id="canvas"></canvas>
+    <audio id="audio" src="fireworks.mp3" preload="auto"></audio>
+
+    <script>
+        // 微信音频自动播放解决方案
+        function playExplosionSound() {
+            const audio = new Audio('firework.mp3');
+            audio.play().catch(e => {
+                // 微信环境下需要用户交互
+                document.addEventListener('click', function handler() {
+                    audio.play();
+                    document.removeEventListener('click', handler);
+                });
+            });
+        }
+        document.addEventListener('WeixinJSBridgeReady', function() {
+            const audio = document.getElementById('audio');
+            audio.play().catch(e => console.log('需要用户交互后才能播放'));
+        });
+
+        // 启动按钮（绕过微信限制）
+        document.getElementById('startButton').addEventListener('click', function() {
+            this.style.display = 'none';
+            const audio = document.getElementById('audio');
+            audio.play().catch(e => console.log('播放失败:', e));
+            animate();
+        });
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let fireworks = [];
+        let particles = [];
+        
+        // 设置画布尺寸
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // 启动按钮（绕过微信限制） - 删除这个重复的监听器
+        document.getElementById('startButton').addEventListener('click', function() {
+            this.style.display = 'none';
+            document.getElementById('audio').play();
+            animate();
+        });
+
+        // 保留这个更完善的监听器
+        document.getElementById('startButton').addEventListener('click', function() {
+            this.style.display = 'none';
+            const audio = document.getElementById('audio');
+            audio.play().catch(e => console.log('播放失败:', e));
+            animate();
+        });
+
+        // 烟花逻辑
+        class Firework {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height;
+                this.targetY = Math.random() * canvas.height * 0.5;
+                this.speed = 3 + Math.random() * 2; // 随机速度
+                this.exploded = false;
+                this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                this.trail = [];
+            }
+            update() {
+                if (!this.exploded) {
+                    this.y -= this.speed;
+                    // 记录轨迹点
+                    this.trail.push({x: this.x, y: this.y});
+                    if (this.trail.length > 8) this.trail.shift();
+                    
+                    // 绘制上升轨迹
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                    for (let i = 1; i < this.trail.length; i++) {
+                        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                    }
+                    ctx.stroke();
+                    
+                    if (this.y <= this.targetY) {
+                        this.explode();
+                    }
+                }
+            }
+            explode() {
+                // 原有粒子爆炸代码
+                for (let i = 0; i < 150; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * 10;
+                    particles.push(new Particle(
+                        this.x + Math.cos(angle) * radius,
+                        this.y + Math.sin(angle) * radius,
+                        this.color
+                    ));
+                }
+                
+                // 10%概率显示名字
+                if (Math.random() < 0.1) {
+                    const name = names[Math.floor(Math.random() * names.length)];
+                    nameParticles.push({
+                        x: this.x,
+                        y: this.y,
+                        name: name,
+                        alpha: 1,
+                        size: 30 + Math.random() * 20, // 随机大小
+                        decay: 0.005 + Math.random() * 0.01 // 随机消失速度
+                    });
+                }
+                
+                this.exploded = true;
+                
+                const audio = new Audio('fireworks.mp3');
+                audio.volume = 0.7;
+                audio.play().catch(e => console.log('音效播放失败:', e));
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = Math.random() * 12 + 3;
+                this.friction = 0.9 + Math.random() * 0.05;
+                this.gravity = 0.15 + Math.random() * 0.1;
+                this.alpha = 1;
+                this.size = Math.random() * 3 + 1; // 统一使用这个尺寸
+                this.decay = 0.01 + Math.random() * 0.02; // 统一使用这个消失速度
+            }
+            update() {
+                // 优化物理计算
+                this.speed *= this.friction;
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed + this.gravity;
+                this.alpha -= this.decay;
+                
+                // 绘制粒子
+                ctx.fillStyle = `${this.color.replace(')', `, ${this.alpha})`)}`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                return this.alpha > 0;
+            }
+        }
+
+        let lastFrameTime = null;
+        let lastLogTime = performance.now(); // 添加这行定义
+
+        function animate() {
+            const now = performance.now();
+            if (!lastFrameTime) lastFrameTime = now;
+            const deltaTime = now - lastFrameTime;
+            lastFrameTime = now;
+
+            // 优化清屏操作
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)'; // 调整透明度减少重绘
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 限制烟花生成频率
+            if (Math.random() < 0.03 * (deltaTime/16)) { // 基于帧率调整
+                fireworks.push(new Firework());
+            }
+
+            // 更新名字粒子
+            nameParticles.forEach((np, index) => {
+                np.alpha -= np.decay;
+                drawName(np.x, np.y, np.name, np.alpha);
+                
+                if (np.alpha <= 0) {
+                    nameParticles.splice(index, 1);
+                }
+            });
+            // 删除这个重复的生成逻辑
+            // if (Math.random() < 0.04) { // 调整生成频率
+            //     fireworks.push(new Firework());
+            // }
+
+            // 更新逻辑保持不变
+            fireworks = fireworks.filter(firework => {
+                firework.update();
+                return !firework.exploded;
+            });
+
+            particles = particles.filter(particle => particle.update());
+
+            // 监控帧率(仅开发时使用)
+            if (performance.now() - lastLogTime > 1000) {
+                console.log(`当前粒子数: ${particles.length} 烟花数: ${fireworks.length}`);
+                lastLogTime = performance.now();
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        const names = ["520快乐呀！", "❤️❤️❤️", "LOVE", "520", "张芳"];
+        const nameParticles = [];
+
+        function drawName(x, y, name, alpha) {
+            // 缓存文字测量结果
+            if (!this.nameMetrics) {
+                this.nameMetrics = ctx.measureText(name);
+            }
+            
+            // 简化效果但保持美观
+            ctx.fillStyle = `hsla(340, 100%, 70%, ${alpha})`; // 固定颜色减少计算
+            const rotation = Math.sin(Date.now() * 0.001) * 5; // 轻微旋转角度(-5到5度)
+            const scale = 0.95 + Math.sin(Date.now() * 0.003) * 0.1; // 柔和缩放
+            
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation * Math.PI / 180);
+            ctx.scale(scale, scale);
+            
+            // 使用心形渐变颜色
+            const gradient = ctx.createRadialGradient(0, 0, 10, 0, 0, 50);
+            gradient.addColorStop(0, `hsla(340, 100%, 70%, ${alpha})`);
+            gradient.addColorStop(1, `hsla(0, 100%, 70%, ${alpha})`);
+            
+            ctx.fillStyle = gradient;
+            ctx.font = `bold ${80}px 'Arial', 'Microsoft YaHei', sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            
+            // 添加柔和阴影
+            ctx.shadowColor = `hsla(340, 100%, 70%, ${alpha * 0.3})`;
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            
+            ctx.fillText(name, 0, 0);
+            ctx.restore();
+        }
+    </script>
+</body>
+</html>
