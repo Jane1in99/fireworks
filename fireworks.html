@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>烟花特效</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <style>
         body {
             margin: 0;
@@ -25,6 +25,21 @@
             border-radius: 25px;
             font-size: 20px;
             cursor: pointer;
+            /* 添加移动端优化 */
+            min-width: 120px;
+            min-height: 50px;
+            touch-action: manipulation;
+        }
+        @media screen and (max-width: 768px) {
+            #startButton {
+                font-size: 18px;
+                padding: 12px 24px;
+            }
+            
+            /* 调整名字粒子大小 */
+            .name-particle {
+                font-size: 24px !important;
+            }
         }
     </style>
 </head>
@@ -196,7 +211,10 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // 限制烟花生成频率
-            if (Math.random() < 0.03 * (deltaTime/16)) { // 基于帧率调整
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const particleLimit = isMobile ? 80 : 150; // 移动端减少粒子数量
+            
+            if (Math.random() < 0.03 * (deltaTime/16) && (!isMobile || fireworks.length < 3)) {
                 fireworks.push(new Firework());
             }
 
